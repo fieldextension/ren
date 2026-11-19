@@ -1,0 +1,114 @@
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = ["ren", "ren_cli"]
+
+[project]
+name = "ren"
+version = "0.0.1"
+description = "A polynomial engine for homomorphic encryption"
+readme = "README.md"
+license = "MIT AND Apache-2.0 AND BSL-1.0"
+license-files = ["LICENSE", "THIRD_PARTY.md"]
+requires-python = ">=3.14"
+dependencies = [
+    "cuda-bindings>=13.4.4; platform_system == 'Linux'",
+    "numpy>=2.5.4",
+    "mpmath>=1.4.1",
+    "cryptography>=50.0.2",
+    "python-flint>=0.9.0",
+]
+
+[project.optional-dependencies]
+profiling = ["nvtx>=0.2.16"]
+
+[project.urls]
+Repository = "https://github.com/fieldextension/ren"
+Issues = "https://github.com/fieldextension/ren/issues"
+
+[project.scripts]
+ren = "ren_cli:main"
+
+[dependency-groups]
+lint = [
+    "ruff>=0.17.1",
+]
+test = [
+    "attrs>=26.1.0",
+    "pytest>=9.1.1",
+    "pytest-xdist>=3.8.0",
+]
+typecheck = [
+    "ty==0.0.90",
+]
+infra = [
+    "rust-just>=1.59.0",
+]
+dev = [
+    {include-group = "lint"},
+    {include-group = "test"},
+    {include-group = "typecheck"},
+]
+
+[tool.ruff]
+preview = true
+extend-exclude = ["*.md"]
+line-length = 150
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "B006",
+    "B020",
+    "B025",
+    "B026",
+    "B028",
+    "B032",
+    "B033",
+    "B039",
+    "B904",
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "PGH003",
+    "PYI020",
+    "RUF012",
+    "RUF018",
+    "UP010",
+    "UP037",
+    "UP040",
+    "UP045",
+]
+ignore = ["E741"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ty.src]
+include = ["ren", "ren_cli", "tests"]
+
+[tool.ty.environment]
+extra-paths = ["stubs"]
+
+[[tool.ty.overrides]]
+include = ["ren/backends/cuda/api.py"]
+
+[tool.ty.overrides.analysis]
+# Ren installs CUDA bindings only on Linux; their compiled modules ship no Python stubs.
+# Allow these missing imports without discarding type information if stubs become available.
+allowed-unresolved-imports = ["cuda.bindings", "cuda.bindings.driver", "cuda.bindings.nvrtc", "cuda.pathfinder"]
+
+[tool.ty.rules]
+blanket-ignore-comment = "error"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "requires_cuda: skip test if CUDA is not available",
+    "requires_multi_gpu: skip test if fewer than 2 GPUs available",
+]

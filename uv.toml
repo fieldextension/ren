@@ -1,0 +1,4 @@
+required-version = ">=0.13.5"
+
+[audit]
+malware-check = true

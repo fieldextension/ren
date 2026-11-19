@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UV_MANAGED_PYTHON: "true"
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          cache-dependency-glob: "uv.lock"
+          cache-suffix: test
+      - name: Verify lockfile
+        run: uv lock --check
+      - name: Install dependencies
+        run: uv sync --locked --no-dev --group test
+      - name: Run fast tests
+        run: uv run --no-sync pytest -q -n auto --dist worksteal -m "not slow" --ignore=tests/packaging --durations=20
+
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          cache-dependency-glob: "uv.lock"
+          cache-suffix: test
+          save-cache: false
+      - name: Install dependencies
+        run: uv sync --locked --no-dev --group test
+      - name: Test packaged starter
+        run: uv run --no-sync pytest -q tests/packaging --durations=10
+
+  lint:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          cache-dependency-glob: "uv.lock"
+          cache-suffix: ${{ github.job }}
+      - name: Install dependencies
+        run: uv sync --locked --only-group lint --only-group infra
+      - name: Install clang-format 23
+        run: |
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o /tmp/llvm.asc
+          sudo install -m 644 /tmp/llvm.asc /usr/share/keyrings/llvm.asc
+          echo "deb [signed-by=/usr/share/keyrings/llvm.asc] https://apt.llvm.org/resolute/ llvm-toolchain-resolute-23 main" | sudo tee /etc/apt/sources.list.d/llvm-23.list
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y clang-format-23
+          clang-format-23 --version
+      - name: Check lint and formatting
+        env:
+          CLANG_FORMAT: /usr/bin/clang-format-23
+          UV_NO_SYNC: "1"
+        run: uv run just lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: false
+      - name: Install dependencies
+        run: uv sync --locked --no-dev --group typecheck --group test
+      - name: ty
+        run: uv run --no-sync ty check

@@ -1,0 +1,11 @@
+[project]
+name = ${name}
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = ["ren"]
+
+[tool.uv.sources]
+ren = { ${source} }
+
+[dependency-groups]
+dev = ["pytest", "ruff", "ty"]
